@@ -1,28 +1,24 @@
 import express from "express";
 import cors from "cors";
-import { PrismaClient } from "@prisma/client";
+// import { PrismaClient } from "./generated/prisma-client";
 import { z } from "zod";
-import dotenv from "dotenv";
-import OpenAI from "openai";
-
-dotenv.config();
+import "dotenv/config";
+import { Ollama } from "ollama";
 
 const app = express();
-const prisma = new PrismaClient();
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const PORT = process.env.PORT || 3000;
+// const prisma = new PrismaClient();
+const ollama = new Ollama({ host: "http://localhost:11434" });
+const PORT = process.env.PORT || 8000;
 
 app.use(express.json());
 app.use(cors());
 
 const reviewSchema = z.object({
   title: z.string().optional(),
-  langugae: z.string(),
+  language: z.string(),
   code: z.string(),
-  feedback: z.string(),
-  modelName: z.string().default("gpt-4o"),
+  feedback: z.string().optional(),
+  modelName: z.string(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -57,21 +53,25 @@ app.post("/app/reviews", async (req, res) => {
 
         Provide the model with a diverse set of code examples, including both correct and incorrect implementations, as well as various programming languages and styles.`;
 
-    const userPrompt = `Language: ${parsedData.langugae ?? "unknown"}
+    const userPrompt = `Language: ${parsedData.language ?? "unknown"}
         Code: ${parsedData.code ?? "no code provided"}
         Please analyze the above code and provide constructive feedback with suggestions for improvement.`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await ollama.chat({
       model: parsedData.modelName,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.7,
-      max_completion_tokens: 1200,
     });
+    console.log("test", completion);
+    res.send(completion);
   } catch (error) {
     console.error("Error creating review:", error);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
